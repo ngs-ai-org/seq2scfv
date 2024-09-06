@@ -27,7 +27,7 @@ aa_linkers <- df %>%
   dplyr::count(aa_linker, sort = TRUE) %>%
   mutate(freq = round((n / sum(n)) * 100, 2)) %>%
   head(10) %>%
-  mutate(ref_linker_present = str_detect(aa_linker, reflink))
+  mutate(ref_linker_present = str_detect(aa_linker, as.character(reflink)))
 
 nt_linkers <- df %>%
   dplyr::count(nt_linker, sort = TRUE) %>%
