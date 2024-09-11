@@ -33,7 +33,9 @@
     - [Usage](#usage-5)
     - [Example](#example-5)
     - [Output](#output-5)
-
+7. [Post-processing example](#8-post-processing-example)
+    - [Usage](#r-execution)
+    - [Output](#output-6)
 
 ## Introduction 
 
@@ -64,28 +66,9 @@ Seq2scFv is under a license that grants non-profit organizations permission to u
 
 ### Requirements
 
-Seq2scFv relies on several external tools and libraries. Ensure the following are installed:
-- seqkit v. 2.7.0
-- igBLAST v. 1.20.0 (we suggest to use the same version: newer versions might not be compatible with the algorithms presented here)
-- clustalOmega v. 1.2.4
-- R v. 4.0.0   
-- Python 3.11.5
+A Docker file is provided with all required tools and packages to run Seq2scFv. 
 
-Versions of R packages:
-```text
-gridExtra version 2.3
-ggplot2 version 3.4.1
-dplyr version 1.1.1
-stringr version 1.5.0
-```
 
-Also, the following Python libraries are required: 
-```text
-biopython v.1.79
-antpack v.0.1.0
-logomaker 0.8 # required separate Python version 3.6.9
-matplotlib 3.3.4
-``` 
 ### Workflow
 
 <img src="figures/workflow_seq2scfv.png" width="1000">
@@ -107,7 +90,7 @@ Quality preprocessing of the data is not part of Seq2scFv; we assume your data h
 
 Filtering out reads that fall outside the expected size interval is also recommended.
 
-For an example of preprocessing, refer to the provided script: `example_preprocessing.sh`. The final preprocessed files, saved to `Example_dataset/1.Preprocessed`, are quality filtered, do not contain any primer sequences and have been size filtered (keeping only reads of 900 - 1200 bp). You can use any tool you prefer, as long as you end up with high-quality sequences in fasta format to continue analyses with Seq2scFv.
+For an example of preprocessing, refer to the provided script: `example_preprocessing.sh`. The final preprocessed files, saved to `1.Preprocessed` in the Zenodo entry associated to the publication (https://zenodo.org/records/12635263), are quality filtered, do not contain any primer sequences and have been size filtered (keeping only reads of 900 - 1200 bp). You can use any tool you prefer, as long as you end up with high-quality sequences in fasta format to continue analyses with Seq2scFv.
 
 ### 2. SEGUID, library merging, and redundancy removal
 
@@ -120,23 +103,23 @@ Then, all fasta files are merged into a single one and redundancy is removed usi
 #### Example
 
 ```bash
-input_dir="Example_dataset/1.Preprocessed"
+input_dir="1.Preprocessed"
 
 files=("${input_dir}/CD160_P0_CCS.filtered.adapt.sizetrim.fasta" \
        "${input_dir}/CD160_P1_CCS.filtered.adapt.sizetrim.fasta" \
        "${input_dir}/CD160_P2_CCS.filtered.adapt.sizetrim.fasta" \
-       "${input_dir}/CD160_P3_CCS.filtered.adapt.sizetrim.fasta")
-
-mkdir 2.Catalogued
-cd 2.Catalogued
+       "${input_dir}/CD160_P3_CCS.filtered.adapt.sizetrim.fasta") 
 
 for fastq in "${files[@]}"; do
   basename=$(basename "$fastq" .filtered.adapt.sizetrim.fasta)
-  ./bin/uniq_id.py $basename $fastq
+  uniq_id.py $basename $fastq
 done
 
 cat *correspondence.tsv > merged.nt_correspondence.tsv
 seqkit rmdup -n < <(cat CD160_P*_CCS.nt_seguid.fa) > merged.nt_seguid.fa
+
+mkdir 2.Catalogued
+mv *correspondence* *seguid* 2.Catalogued/
 ```
 #### Output
 The subset of the merged correspondence file, shown below, illustrates the table structure. First, the SEGUID which contains a "_nt_qual" suffix to indicate that the SEGUID is encoding a non annotated, quality filtered / trimmed read. The second column holds the CCS identifier, or original header of the fastq / fasta file. Finally, the "Library" column indicates in which sequencening library (aka pannig round) the specific sequence was identified.
@@ -183,7 +166,7 @@ For the example dataset, we aligned germline gene databases from *Rattus norvegi
 #### Example
 ```bash
 # Example of user input
-fasta="Example_dataset/2.Catalogued/merged.nt_seguid.fa"
+fasta="2.Catalogued/merged.nt_seguid.fa"
 ig_seqtype="Ig"
 ig_threads="8"
 organism="rat"
@@ -199,7 +182,7 @@ auxiliary_data="/path_to_IgBLAST_files/optional_file/rat_gl.aux"
 mkdir 3.vscan
 cd 3.vscan
 
-./bin/vscan_functions.py --query $fasta \
+vscan_functions.py --query $fasta \
       --germline_V $germline_db_V \
       --germline_D $germline_db_D \
       --germline_J $germline_db_J \
@@ -255,10 +238,10 @@ scFv_splitter.py --igBLAST-hits igBLAST.tsv --domain-type domain_system
 #### Example
 ```bash
 # Example of user input
-hits="Example_dataset/3.vscan/igBLAST.tsv"
+hits="3.vscan/igBLAST.tsv"
 domain_system="imgt"
 
-./bin/scFv_splitter.py --igBLAST-hits $hits --domain-type $domain_system 
+scFv_splitter.py --igBLAST-hits $hits --domain-type $domain_system 
 ```
 
 #### Output
@@ -304,7 +287,7 @@ get_logos.py --nt-aln nt_inferred_linkers.aln --aa-aln aa_inferred_linkers.aln -
 |------------------|--------|----------| ------------|
 | `--nt-aln`       | string | required | Path to the nt linker alignment | 
 | `--aa-aln`       | string | required | Path to the aa linker alignment |
-| `--check-linker` | string | required | Provided (known) aa linker sequence to compare to inferred consensus linker. If not known: 'undefined'|
+| `--check-linker` | string | required | If known, provide the aa linker sequence to compare it to inferred consensus linker. If not known, state 'undefined' and the consensus linker will be determined as reference|
 
 If the linker is "undefined", `get_logos.py` will write the consensus linker to `aa_reference_linker.fasta`. If you provide a linker sequence, this will be written to `aa_reference_linker.fasta`. Additionally, the provided linker and the inferred consensus are compared and the result is notified under `inferred_vs_provided_linker_evaluation.txt`. 
 
@@ -316,8 +299,8 @@ linker_scorer.py --scFv in_frame_igBLAST_paired_delim.tsv --linker aa_reference_
 
 | Parameter  | Type   | Required | Description |
 |------------|--------|----------| ------------|
-| `--scFv`   | string | required | TSV file containing annotations of all in-frame scFv. Default: in_frame_igBLAST_paired_delim.tsv | 
-| `--linker` | string | required | Reference linker sequence. Default: aa_reference_linker.fasta |
+| `--scFv`   | string | required | TSV file containing annotations of all in-frame scFv.| 
+| `--linker` | string | required | FASTA file containing the reference linker sequence.|
 
 *Overview of inferred linkers across the dataset*
 
@@ -329,9 +312,9 @@ Seq2scFv also provides R scripts for the characterization of the inferred linker
 
 ```bash
 # Consensus linker and scoring
-aalink="Example_dataset/4.scFv_split/aa_inferred_linkers.fasta"
-ntlink="Example_dataset/4.scFv_split/nt_inferred_linkers.fasta"
-scfvs="Example_dataset/4.scFv_split/in_frame_igBLAST_paired_delim.tsv"
+aalink="4.scFv_split/aa_inferred_linkers.fasta"
+ntlink="4.scFv_split/nt_inferred_linkers.fasta"
+scfvs="4.scFv_split/in_frame_igBLAST_paired_delim.tsv"
 linksample=0.1
 
 cat ${ntlink} | seqkit sample -p $linksample -o nt_inferred_linkers_${linksample}_sampled.fasta
@@ -447,7 +430,7 @@ scfv_flags.py --scFv in_frame_igBLAST_paired_delim_linker_scored.tsv --linker-mi
 
 #### Example
 ```bash
-linkerscored="Example_dataset/5.Linkers/in_frame_igBLAST_paired_delim_linker_scored.tsv"
+linkerscored="5.Linkers/in_frame_igBLAST_paired_delim_linker_scored.tsv"
 pcntlinkID="90"
 maxmismatches="2"
 maxlinkeroverhang="undefined"
@@ -489,15 +472,15 @@ CD160_P3_CCS
 ```
 
 ```bash
-scFv="Example_dataset/6.Flags/in_frame_igBLAST_paired_delim_linker_scored_flags.tsv"
-corr="Example_dataset/2.Catalogued/merged.nt_correspondence.tsv"
-libs="Example_dataset/focus_libs.txt"
+scFv="6.Flags/in_frame_igBLAST_paired_delim_linker_scored_flags.tsv"
+corr="2.Catalogued/merged.nt_correspondence.tsv"
+libs="focus_libs.txt"
 
 ntqual_counts.py --scFv $scFv --correspondence $corr --focus-libraries $libs
 ```
 
 #### Output
-The count columns are appended to the scFv annotation table. As an example, below is a subset of the table. Each row represents a unique read (adapter-trimmed and quality-filtered). The number of times each read has been observed in each of the panning rounds is shown in the last columns. As the table provides information such as the scFv sequence (at the aa or nt level), or the HCDR3, the user is able to aggregate the counts according to the region of interest, facilitating the analysis of its amplication across selection rounds.  
+The count columns are appended to the scFv annotation table. As an example, below is a subset of the table. Each row represents a unique read (adapter-trimmed and quality-filtered). The number of times each read has been observed in each of the panning rounds is shown in the last columns. As the table provides information such as the scFv sequence (at the aa or nt level), or the HCDR3, the user is able to aggregate the counts according to the region of interest, facilitating the analysis of its amplication across selection rounds. See the next section for some examples. 
 
 |sequence_id			                      |...|VH_cdr3_aa   |...|CD160_P0_CCS|CD160_P1_CCS|CD160_P2_CCS|CD160_P3_CCS|
 |---------------------------------------|---|-------------|---|------------|------------|------------|------------|
@@ -510,5 +493,70 @@ The count columns are appended to the scFv annotation table. As an example, belo
 |A1V4+e/5Fl2NPZc/EAbJVSyduPc_nt_qual 		|...|ATHNYESTVFDY |...| 	        0| 	         2| 	       47| 	        15|
 |m+oVmm/JMyjs61pwVskDrcO6tAI_nt_qual		|...|ATHNYESTVFDY |...| 	        0| 	         1| 	       44| 	        28|
 
-
 The full description of all the annotation columns is provided under `annotation_columns.xlsx`. 
+
+### 8. Post-processing example
+
+#### R execution 
+
+```r
+library(dplyr)
+
+# Load Seq2scFv output & library names 
+seq2scFv_output <- "7.Counts/in_frame_igBLAST_paired_delim_linker_scored_flags_counts.tsv"
+libs <- "focus_libs.txt"
+
+df <- read.table(seq2scFv_output,
+                 fill = TRUE,
+                 header = TRUE,
+                 sep = "\t",
+                 row.names = NULL)
+
+focus_libs <- read.table(libs)$V1
+
+# Remove NAs, filter out sequences with bad linkers and incorrect VH-VL order
+filt_df <- df[!is.na(df$total_nt_qual), ] %>%
+  filter(VH_IGH == 1,
+         score_pcnt >= 75,
+         mismatches <= 2,
+         linker_overhang <= 10)
+
+# Collapse the sequences based on identical VH & VL (aa level)
+VH_VL <- filt_df %>% 
+  group_by(VH_sequence_alignment_aa, VL_sequence_alignment_aa) %>% 
+  summarise((across(focus_libs[1]:total_nt_qual, sum)))
+
+# Collapse the sequences based on identical HCDR3 (aa level)
+HCDR3 <- filt_df %>% 
+  group_by(VH_cdr3_aa) %>%
+  summarise((across(focus_libs[1]:total_nt_qual, sum)))
+```
+#### Output
+
+The tables below are an illustration, not representing the totality of all columns (and column names have been formatted). 
+
+**Sequences collapsed on identical VH-VL**
+
+| **VH**            | **VL**            | **P0** | **P1** | **P2** | **P3** |
+|-------------------|-------------------|--------|--------|--------|--------|
+| `EVQLVESGGD...`    | `EIVLTQSPTT...`   | 0      | 0      | 88     | 42     |
+| `EVQLVESGGG...`    | `EIVLTQSPTT...`   | 0      | 1      | 59     | 68     |
+| `EVQLVESGGG...`    | `DTVLTQSPTS...`   | 0      | 0      | 71     | 50     |
+| `QVQLKESGPG...`    | `DIQLTQSPSL...`   | 0      | 0      | 61     | 30     |
+| `EVKLVESGGG...`    | `EIVLTQSPTS...`   | 0      | 0      | 54     | 24     |
+| `EVKLVESGGG...`    | `EIVLTQSPTP...`   | 0      | 0      | 42     | 26     |
+| `...`              | `...`             | ...    | ...    | ...    | ...    |
+ 
+
+
+**Sequences collapsed on identical HCDR3**
+
+| **HCDR3**         | **P0** | **P1** | **P2** | **P3** |
+|-------------------|--------|--------|--------|--------|
+| `ARGWTH`          | 75     | 301    | 1630   | 258    |
+| `ATHNYESTVFDY`    | 6      | 28     | 1245   | 592    |
+| `VTHNYESTVFDY`    | 0      | 9      | 446    | 282    |
+| `ARGMEA`          | 2      | 43     | 415    | 151    |
+| `ATHNYESTIFDY`    | 0      | 6      | 229    | 79     |
+| `ARGLAY`          | 7      | 22     | 151    | 78     |
+| `...`             | ...    | ...    | ...    | ...    |
