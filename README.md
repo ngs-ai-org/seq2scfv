@@ -179,9 +179,6 @@ germline_db_D="/path_to_IgBLAST_formatted/rat_gl_D"
 germline_db_J="/path_to_IgBLAST_formatted/rat_gl_J"
 auxiliary_data="/path_to_IgBLAST_files/optional_file/rat_gl.aux"
 
-mkdir 3.vscan
-cd 3.vscan
-
 vscan_functions.py --query $fasta \
       --germline_V $germline_db_V \
       --germline_D $germline_db_D \
@@ -193,6 +190,11 @@ vscan_functions.py --query $fasta \
       --num_threads $ig_threads \
       --minlen $minlen \
       --escore $escore
+
+# organize output
+mkdir 3.vscan
+mv igBLAST.tsv 3.vscan/
+rm ddDNA*tsv ddDNA*fasta # optional
 ```
 
 #### Output 
@@ -242,6 +244,10 @@ hits="3.vscan/igBLAST.tsv"
 domain_system="imgt"
 
 scFv_splitter.py --igBLAST-hits $hits --domain-type $domain_system 
+
+# organize output
+mkdir 4.scFv_split
+mv *fasta *tsv 4.scFv_split/
 ```
 
 #### Output
@@ -325,7 +331,7 @@ clustalo --use-kimura -i aa_inferred_linkers_${linksample}_sampled.fasta -o aa_i
 
 get_logos.py --nt-aln nt_inferred_linkers.aln --aa-aln aa_inferred_linkers.aln --check-linker 'undefined'
 
-../bin/linker_scorer.py --scFv $scfvs --linker aa_reference_linker.fasta
+linker_scorer.py --scFv $scfvs --linker aa_reference_linker.fasta
 ```
 ```bash
 # Linker overview across the dataset
@@ -338,6 +344,10 @@ linklengths.r nt_inferred_linkers_lengths.tsv aa_inferred_linkers_lengths.tsv
 
 # Most frequent linkers
 top_linkers.r $scfvs aa_reference_linker.fasta
+
+# organize output 
+mkdir 5.Linkers
+mv inferred_vs_provided_linker_evaluation.txt *tsv *fasta *aln *pdf *png 5.Linkers/
 ```
 #### Output
 
@@ -437,6 +447,10 @@ maxlinkeroverhang="undefined"
 chain_min_aa_len="80"
 
 scfv_flags.py --scFv ${linkerscored} --linker-min-id $pcntlinkID --mismatches $maxmismatches --linker-overhang $maxlinkeroverhang --chain-length $chain_min_aa_len
+
+# organize output
+mkdir 6.Flags
+mv in_frame_igBLAST_paired_delim_linker_scored_flags.tsv 6.Flags/
 ```
 #### Output
 
@@ -477,6 +491,10 @@ corr="2.Catalogued/merged.nt_correspondence.tsv"
 libs="focus_libs.txt"
 
 ntqual_counts.py --scFv $scFv --correspondence $corr --focus-libraries $libs
+
+# organize output
+mkdir 7.Counts                 
+mv in_frame_igBLAST_paired_delim_linker_scored_flags_counts.tsv 7.Counts/
 ```
 
 #### Output
